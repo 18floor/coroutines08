@@ -33,3 +33,9 @@ data class Author(
 )
 
 enum class AttachmentType { IMAGE, VIDEO, DOC }
+
+data class PostAuthorComments(
+    val post: Post,
+    val author: Author,
+    val comments: List<Comment>
+)
