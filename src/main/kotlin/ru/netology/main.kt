@@ -14,7 +14,7 @@ import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 private val gson = Gson()
-private val BASE_URL = "http://127.0.0.1:9999"
+private const val BASE_URL = "http://127.0.0.1:9999"
 private val client = OkHttpClient.Builder()
     .addInterceptor(HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BASIC
@@ -40,6 +40,7 @@ suspend fun OkHttpClient.apiCall(url: String): Response {
     }
 }
 
+@Suppress("BlockingMethodInNonBlockingContext")
 suspend fun <T> makeRequest(url: String, client: OkHttpClient, typeToken: TypeToken<T>): T =
     withContext(Dispatchers.IO) {
         client.apiCall(url)
@@ -63,17 +64,24 @@ suspend fun getComments(client: OkHttpClient, id: Long): List<Comment> =
     makeRequest("$BASE_URL/api/slow/posts/$id/comments", client, object : TypeToken<List<Comment>>() {})
 
 
-fun main(args: Array<String>) {
+fun main() {
     with(CoroutineScope(EmptyCoroutineContext)) {
         launch {
             try {
                 val posts = getPosts(client)
                     .map { post ->
                         async {
-                            PostAuthorComments(post, getAuthor(client, post.authorId), getComments(client, post.id))
+                            PostWithAuthor(post, getAuthor(client, post.authorId),
+                                getComments(client, post.id)
+                                    .map { comment ->
+                                        CommentWithAuthor(comment, getAuthor(client, comment.authorId))
+                                    }
+                            )
                         }
                     }.awaitAll()
+
                 println(posts)
+
             } catch (e: Exception) {
                 e.printStackTrace()
             }
